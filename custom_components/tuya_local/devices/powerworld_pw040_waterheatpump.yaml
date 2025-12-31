@@ -1,4 +1,4 @@
-name: Water heat pump
+name: air-to-water heat pump
 products:
   - id: 5oc9wmac3bbidekc
     manufacturer: Powerworld / Michl
@@ -14,13 +14,28 @@ entities:
           - dps_val: false
             value: "off"
           - dps_val: true
-            value: heat_pump
+            constraint: work_mode
+            conditions:
+              - dps_val: heat
+                value: heat
+              - dps_val: wth
+                value: hotwater
+              - dps_val: cool
+                value: cool
+              - dps_val: wth_heat
+                value: hotwater_heat
+              - dps_val: wth_cool
+                value: hotwater_cool
+      - id: 5
+        type: string
+        name: work_mode
+        hidden: true
       - id: 123
         type: integer
         name: temperature
         unit: C
         range:
-          min: 30
+          min: 28
           max: 55
       - id: 108  # Warmwasser_T (ist): hot water (actual value)
         type: integer
@@ -33,24 +48,6 @@ entities:
         range:
           min: 0
           max: 9999
-  - entity: select
-    translation_key: heat_pump_mode
-    category: config
-    dps:
-      - id: 5
-        type: string
-        name: option
-        mapping:
-          - dps_val: heat
-            value: heat
-          - dps_val: wth
-            value: hotwater
-          - dps_val: cool
-            value: cool
-          - dps_val: wth_heat
-            value: hotwater_heat
-          - dps_val: wth_cool
-            value: hotwater_cool
   - entity: climate
     dps:
       - id: 1
@@ -106,27 +103,29 @@ entities:
           - dps_val: wth_cool
             value: false
           - value: true
-      - id: 2
+      - id: 132
         type: string
-        name: preset_mode
-        mapping:
-          - dps_val: smart
-            value: comfort
-          - dps_val: strong
-            value: boost
-          - dps_val: mute
-            value: eco
+        name: heat_mode
+        hidden: true
       - id: 101
         type: integer
         name: current_temperature
-      - id: 125
+      - id: 102  # value_redirect to 124, 125
         type: integer
         name: temperature
         unit: C
         range:
-          min: 28
+          min: 30
           max: 55
         mapping:
+          - constraint: heat_mode
+            conditions:
+              - dps_val:
+                  - 0
+                value_redirect: manualHeatTemp
+                range:
+                  min: 28
+                  max: 55
           - constraint: work_mode
             conditions:
               - dps_val:
@@ -136,25 +135,59 @@ entities:
                 range:
                   min: 7
                   max: 30
+      - id: 125
+        hidden: true
+        type: integer
+        name: manualHeatTemp
+        unit: C
+        range:
+          min: 28
+          max: 55
       - id: 124
         hidden: true
         type: integer
+        unit: C
         name: cooling_temp
         range:
           min: 7
           max: 30
   - entity: select
-    name: Heating return
+    name: heat_mode  # heating return flow control
     category: config
     dps:
       - id: 132
         type: string
         name: option
         mapping:
-          - dps_val: 0
-            value: Manual
-          - dps_val: 1
-            value: Eco
+          - dps_val: 0  # man RLsoll_T (take return flow target of id=125)
+            value: manual
+          - dps_val: 1  # HeizKennlinie (characteristic curve - eco)
+            value: auto
+  - entity: number  # manual heat water temperature
+    name: manualHeatTemp  # Heizwasser_Tsoll manuell (ohne Kennlinie)
+    category: config
+    dps:
+      - id: 125
+        type: integer
+        name: value
+        unit: C
+        range:
+          min: 28
+          max: 55
+  - entity: select
+    name: Power mode
+    category: config
+    dps:
+      - id: 2
+        type: string
+        name: option
+        mapping:
+          - dps_val: smart
+            value: comfort
+          - dps_val: strong
+            value: boost
+          - dps_val: mute
+            value: eco
   - entity: sensor
     name: Outlet temperature
     class: temperature
@@ -166,7 +199,7 @@ entities:
         name: sensor
   - entity: sensor
     class: temperature
-    name: Ambient temperature
+    name: Ambient temperature  # Umgebung_T
     category: diagnostic
     dps:
       - id: 103
@@ -175,7 +208,7 @@ entities:
         name: sensor
         class: measurement
   - entity: sensor
-    name: Gas outlet temperature
+    name: Gas outlet temperature  # GasVL_T
     class: temperature
     category: diagnostic
     dps:
@@ -188,7 +221,7 @@ entities:
           min: -30
           max: 99
   - entity: sensor
-    name: Gas return temperature
+    name: Gas return temperature  # GasRL_T
     class: temperature
     category: diagnostic
     dps:
@@ -198,7 +231,7 @@ entities:
         name: sensor
         class: measurement
   - entity: sensor
-    name: Vaporiser temperature
+    name: Vaporiser temperature  # Verdampfer_T
     class: temperature
     category: diagnostic
     dps:
@@ -211,7 +244,7 @@ entities:
           min: -30
           max: 99
   - entity: sensor
-    name: Coil temperature
+    name: Coil temperature  # Kuehlschlangen_T
     class: temperature
     category: diagnostic
     dps:
@@ -224,7 +257,7 @@ entities:
           min: -30
           max: 99
   - entity: sensor
-    name: EEV opening
+    name: EEV opening  # main expansion valve opening level
     category: diagnostic
     dps:
       - id: 109
@@ -235,8 +268,8 @@ entities:
         range:
           min: 0
           max: 500
-  - entity: sensor  # enthalpy expansion valve opening level
-    name: EEV2 opening
+  - entity: sensor
+    name: EEV2 opening  # enthalpy expansion valve opening level
     category: diagnostic
     dps:
       - id: 111
@@ -248,6 +281,7 @@ entities:
           min: 0
           max: 500
   - entity: sensor
+    name: current  # Kompressor_I (compressor current)
     class: current
     category: diagnostic
     dps:
@@ -260,6 +294,7 @@ entities:
           min: 0
           max: 65
   - entity: sensor
+    name: frequency  # Kompressor_f (compressor frequency)
     class: frequency
     category: diagnostic
     dps:
@@ -272,7 +307,7 @@ entities:
           min: -99
           max: 150
   - entity: sensor
-    name: Heatsink temperature
+    name: Heatsink temperature  # Kuehlkoerper_T
     class: temperature
     category: diagnostic
     dps:
@@ -285,7 +320,7 @@ entities:
           min: -99
           max: 150
   - entity: sensor
-    name: DC voltage
+    name: DC voltage  # Bus_Udc (bus dc voltage)
     class: voltage
     category: diagnostic
     dps:
@@ -298,7 +333,7 @@ entities:
           min: 0
           max: 999
   - entity: sensor
-    name: DC fan 1
+    name: DC fan 1  # DcLuefter1_vWind (dc fan 1 speed)
     category: diagnostic
     dps:
       - id: 116
@@ -310,7 +345,7 @@ entities:
           min: 0
           max: 1500
   - entity: sensor
-    name: DC fan 2
+    name: DC fan 2  # DcLuefter2_vWind (dc fan 2 speed)
     category: diagnostic
     dps:
       - id: 15
@@ -322,8 +357,8 @@ entities:
         range:
           min: 0
           max: 1500
-  - entity: number
-    name: Cooling hysteresis
+  - entity: number  # return flow to cool target value (delta temperature)
+    name: Cooling hysteresis  # RLzuKuehlsoll_dT
     category: config
     dps:
       - id: 121
@@ -334,7 +369,7 @@ entities:
           min: 2
           max: 18
   - entity: number
-    name: Heating hysteresis
+    name: Heating hysteresis  # RLzuRLsoll_dT
     category: config
     dps:
       - id: 122
@@ -345,7 +380,7 @@ entities:
           min: 2
           max: 18
   - entity: number
-    name: Water temperature offset
+    name: Water temperature offset  # WasserAusgleich_T
     class: temperature
     category: config
     dps:
@@ -356,8 +391,8 @@ entities:
         range:
           min: -5
           max: 15
-  - entity: number  # temperature offset of characteristic curve
-    name: Characteristic curve offset
+  - entity: number
+    name: Characteristic curve offset  # Kennlinie_Offset_T
     class: temperature
     category: config
     dps:
@@ -369,7 +404,7 @@ entities:
           min: 0
           max: 40
   - entity: number
-    name: Characteristic curve gradient
+    name: Characteristic curve gradient  # Kennlinie_m_x10
     category: config
     dps:
       - id: 134
@@ -379,7 +414,7 @@ entities:
           min: 1
           max: 30
   - entity: select
-    name: Target temperature action
+    name: Target temperature action  # Kompressor_f @Zieltemperatur
     category: config
     dps:
       - id: 135
@@ -387,11 +422,11 @@ entities:
         name: option
         mapping:
           - dps_val: "0"
-            value: Compressor off
+            value: Compressor keep frequency  # FreqBeibehalten
           - dps_val: "1"
-            value: Compressor reduced frequency
+            value: Compressor reduced frequency  # FreqReduktion
   - entity: number
-    name: Pipe heating start temperature
+    name: Pipe heating start temperature  # RohrheizungStart_T
     class: temperature
     category: config
     dps:
@@ -403,7 +438,7 @@ entities:
           min: -20
           max: 20
   - entity: number
-    name: Hot water start temperature
+    name: Hot water start time  # WarmwasserStart_t
     category: config
     dps:
       - id: 137
@@ -414,7 +449,7 @@ entities:
           min: 0
           max: 60
   - entity: select
-    name: Water pump stop mode
+    name: Water pump stop mode  # Modus WP-Wasserpumpe
     category: config
     dps:
       - id: 138
@@ -424,9 +459,9 @@ entities:
           - dps_val: 0
             value: Immediate stop
           - dps_val: 1
-            value: Ramp down
+            value: Ramp down  # Nachlauf
   - entity: number  # defrost start temperature
-    name: Defrost start temperature
+    name: Defrost start temperature  # Abtau_Tstart
     class: temperature
     category: config
     dps:
@@ -438,7 +473,7 @@ entities:
           min: -15
           max: -1
   - entity: number
-    name: Defrost stop temperature
+    name: Defrost stop temperature  # Abtau_Tstopp
     class: temperature
     category: config
     dps:
@@ -450,7 +485,7 @@ entities:
           min: 1
           max: 40
   - entity: number
-    name: Defrost hysteresis
+    name: Defrost hysteresis  # Abtau_dT
     class: temperature
     category: config
     dps:
@@ -462,7 +497,7 @@ entities:
           min: 0
           max: 15
   - entity: number
-    name: Minimum compressor frequency
+    name: Minimum compressor frequency @ target temperature  # Kompressor_fMin
     class: frequency
     category: config
     dps:
@@ -474,7 +509,7 @@ entities:
           min: 30
           max: 120
   - entity: number
-    name: Maximum compressor frequency
+    name: Maximum compressor frequency @ target temperature  # Kompressor_fMax
     class: frequency
     category: config
     dps:
@@ -486,7 +521,7 @@ entities:
           min: 30
           max: 120
   - entity: number
-    name: Compressor hot water frequency compensation
+    name: Compressor hot water frequency compensation  # Komp_fWW-Kompensation
     class: frequency
     category: config
     dps:
